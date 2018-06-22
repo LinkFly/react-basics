@@ -2,10 +2,12 @@
 
 const express = require('express');
 const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const Todo = require('./model');
 
-const todos = require('./todos');
-
-let nextId = 4;
+mongoose.Promise = Promise;
+mongoose.connect('mongodb://localhost:27017/react-basics');
+mongoose.connection.once('open', () => console.log('Connected to MongoDB'));
 
 const app = express();
 
@@ -17,49 +19,56 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/todos', (req, res) => {
-    res.send(todos);
+  Todo.find({})
+    .then(data => res.send(data.map(todo => {
+      let {title, completed} = todo;
+      let id = todo._id;
+      return {id, title, completed}
+    })));
 });
+
+let toFrontTodo = todoModel => {
+  let {title, completed} = todoModel;
+  let id = todoModel._id;
+  return {id, title, completed};
+};
+
+let updateTodo = (id, fields, res) => {
+  return Todo.findByIdAndUpdate(id, fields, {new: true})
+    .then(todo => {
+      if (!todo) return res.sendStatus(404);
+      res.json(toFrontTodo(todo));
+    });
+};
 
 app.post('/api/todos', (req, res) => {
-    let todo = {
-        id: nextId++,
-        title: req.body.title,
-        completed: false
-    };
-
-    todos.push(todo);
-
-    res.send(todo);
+  Todo.create({title: req.body.title, completed: false})
+    .then(todo => {
+      res.json(toFrontTodo(todo));
+    });
 });
 
+
 app.put('/api/todos/:id', (req, res) => {
-    let todo = todos.find(todo => todo.id == req.params.id);
-
-    if (!todo) return res.sendStatus(404);
-
-    todo.title = req.body.title || todo.title;
-
-    res.json(todo);
+  let {id} = req.params;
+  let {title} = req.body;
+  updateTodo(id, {title}, res);
 });
 
 app.patch('/api/todos/:id', (req, res) => {
-    let todo = todos.find(todo => todo.id == req.params.id);
-
-    if (!todo) return res.sendStatus(404);
-
-    todo.completed = !todo.completed;
-
-    res.json(todo);
+  let {id} = req.params;
+  let {completed} = req.body;
+  updateTodo(id, {completed}, res);
 });
 
 app.delete('/api/todos/:id', (req, res) => {
-    let index = todos.findIndex(todo => todo.id == req.params.id);
-    
-    if (index === -1) return res.sendStatus(404);
-
-    todos.splice(index, 1);
-
-    res.sendStatus(204);
+  Todo.deleteOne({_id: req.params.id})
+    .then(() => {
+      res.sendStatus(204);
+    });
 });
 
-app.listen(5000, 'localhost');
+app.listen(5000, 'localhost')
+  .once('listening', () => {
+    console.log('Server started on 5000');
+  });

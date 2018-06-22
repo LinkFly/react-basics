@@ -1,94 +1,109 @@
 import React from 'react';
-
+import axios from 'axios';
 import Header from './components/Header';
 import Todo from './components/Todo';
 import Form from './components/Form';
 
+let urls = {
+  todos: '/api/todos'
+};
+
 class App extends React.Component {
-    constructor(props) {
-        super(props);
+  constructor(props) {
+    super(props);
 
-        this.state = {
-            todos: []
-        };
+    this.state = {
+      todos: []
+    };
 
-        this.handleAdd = this.handleAdd.bind(this);
-        this.handleDelete = this.handleDelete.bind(this);
-        this.handleToggle = this.handleToggle.bind(this);
-        this.handleEdit = this.handleEdit.bind(this);
-    }
+    this.handleAdd = this.handleAdd.bind(this);
+    this.handleDelete = this.handleDelete.bind(this);
+    this.handleToggle = this.handleToggle.bind(this);
+    this.handleEdit = this.handleEdit.bind(this);
+  }
 
-    nextId() {
-        this._nextId = this._nextId || 4;
+  handleError(error) {
+    console.error(error.message);
+  }
 
-        return this._nextId++;
-    }
+  componentDidMount() {
+    axios.get(urls.todos)
+      .then(response => response.data)
+      .then(todos => this.setState({todos}))
+      .catch(this.handleError)
+  }
 
-    handleAdd(title) {
-        const todo = {
-            id: this.nextId(),
-            title,
-            completed: false
-        };
-
+  handleAdd(title) {
+    axios.post(urls.todos, {title})
+      .then(res => {
+        let todo = res.data;
         const todos = [...this.state.todos, todo];
+        this.setState({todos});
+      })
+      .catch(this.handleError)
+  }
 
-        this.setState({ todos });
-    } 
-
-    handleDelete(id) {
+  handleDelete(id) {
+    axios.delete(`${urls.todos}/${id}`)
+      .then(() => {
         const todos = this.state.todos.filter(todo => todo.id !== id);
+        this.setState({todos});
+      })
+      .catch(this.handleError);
+  }
 
-        this.setState({ todos });
-    }
-
-    handleToggle(id) {
+  handleToggle(id) {
+    let completed = !this.state.todos.find(todo => id === todo.id).completed;
+    axios.patch(`${urls.todos}/${id}`, {completed})
+      .then(res => {
         const todos = this.state.todos.map(todo => {
-            if (todo.id === id) {
-                todo.completed = !todo.completed;
-            }
-
-            return todo;
+          if(todo.id === id){
+            todo = res.data
+          }
+          return todo;
         });
+        this.setState({todos});
+      })
+      .catch(this.handleError)
+  }
 
-        this.setState({ todos });
-    }
-
-    handleEdit(id, title) {
+  handleEdit(id, title) {
+    axios.put(`${urls.todos}/${id}`, {title})
+      .then(res => {
         const todos = this.state.todos.map(todo => {
-            if (todo.id === id) {
-                todo.title = title;
-            }
-
-            return todo;
+          if(todo.id === id){
+            todo = res.data;
+          }
+          return todo;
         });
+        this.setState({todos});
+      })
+      .catch(this.handleError)
+  }
 
-        this.setState({ todos });
-    }
+  render() {
+    return (
+      <main>
+        <Header todos={this.state.todos}/>
 
-    render() {
-        return (
-            <main>
-                <Header todos={this.state.todos} />
+        <section className="todo-list">
+          {this.state.todos.map(todo =>
+            <Todo
+              key={todo.id}
+              id={todo.id}
+              title={todo.title}
+              completed={todo.completed}
+              onDelete={this.handleDelete}
+              onToggle={this.handleToggle}
+              onEdit={this.handleEdit}
+            />)
+          }
+        </section>
 
-                <section className="todo-list">
-                    {this.state.todos.map(todo => 
-                        <Todo
-                            key={todo.id}
-                            id={todo.id}
-                            title={todo.title}
-                            completed={todo.completed}
-                            onDelete={this.handleDelete}
-                            onToggle={this.handleToggle}
-                            onEdit={this.handleEdit}
-                        />)
-                    }
-                </section>
-
-                <Form onAdd={this.handleAdd} />
-            </main>
-        );
-    }
+        <Form onAdd={this.handleAdd}/>
+      </main>
+    );
+  }
 }
 
 export default App;
